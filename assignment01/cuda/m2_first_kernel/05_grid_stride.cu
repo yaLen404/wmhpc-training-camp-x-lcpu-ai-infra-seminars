@@ -7,8 +7,8 @@
 #include "common.h"
 
 __global__ void vectorAdd(const float *a, const float *b, float *c, int n) {
-    int idx = threadIdx.x + blockIdx.x * blockDim.x;
-    if (idx < n) c[idx] = a[idx] + b[idx];
+    for(int idx = threadIdx.x + blockIdx.x * blockDim.x; i < n; i += blockIdx.x * gridDim.x)
+        c[idx] = a[idx] + b[idx];
 }
 
 int main() {
@@ -31,6 +31,7 @@ int main() {
     CUDA_CHECK(cudaMemcpy(d_b, h_b, bytes, cudaMemcpyHostToDevice));
     CUDA_CHECK(cudaMemset(d_c, 0, bytes));
 
+    
     vectorAdd<<<64, 256>>>(d_a, d_b, d_c, n);  // launch 配置不许动
     CUDA_CHECK_KERNEL();
 
