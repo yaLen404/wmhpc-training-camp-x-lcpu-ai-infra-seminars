@@ -31,7 +31,7 @@ int main() {
     int threads = 2048;
     int blocks = (n + threads - 1) / threads;
     vectorAdd<<<blocks, threads>>>(d_a, d_b, d_c, n);
-    CUDA_CHECK_KERNEL()
+    CUDA_CHECK_KERNEL();
     // 注意：这里故意没有做任何错误检查。
 
     CUDA_CHECK(cudaMemcpy(h_c, d_c, bytes, cudaMemcpyDeviceToHost));
