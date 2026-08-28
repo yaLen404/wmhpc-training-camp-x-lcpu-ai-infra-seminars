@@ -1,6 +1,6 @@
 // 问题 3.5：block 内求和归约。
 //
-// 任务：从零实现下面两个 kernel。main 里的判测与计时已经写好，不要改。
+// 任务：从零实现下面两个 kernel。
 //
 // contract（两个 kernel 相同的部分）：
 //   - launch 配置是 <<<nblocks, BLOCK>>>，BLOCK = 256；
@@ -11,14 +11,14 @@
 //   - 每一轮配对加法前后都要 __syncthreads()
 //
 // 两个 kernel 的区别只在“每一轮由哪些线程做加法、加哪个位置”：
-//   - reduce_interleaved（交错配对）：步长 s 取 1, 2, 4, ..., 128，
+//   A. reduce_interleaved（交错配对）：步长 s 取 1, 2, 4, ..., 128，
 //     每轮由 tid % (2*s) == 0 的线程执行 buf[tid] += buf[tid + s]。
 //     以 8 个元素为例：
 //       s=1: buf[0]+=buf[1]  buf[2]+=buf[3]  buf[4]+=buf[5]  buf[6]+=buf[7]
 //            （tid 0、2、4、6 干活，活跃线程在 warp 里隔一个一个）
 //       s=2: buf[0]+=buf[2]  buf[4]+=buf[6]   （tid 0、4 干活）
 //       s=4: buf[0]+=buf[4]                   （tid 0 干活）
-//   - reduce_contiguous（连续配对）：步长 s 取 128, 64, ..., 1，
+//   B. reduce_contiguous（连续配对）：步长 s 取 128, 64, ..., 1，
 //     每轮由 tid < s 的线程执行 buf[tid] += buf[tid + s]。同样 8 个元素：
 //       s=4: buf[0]+=buf[4]  buf[1]+=buf[5]  buf[2]+=buf[6]  buf[3]+=buf[7]
 //            （tid 0-3 干活，活跃线程挤在编号低的一头）
@@ -27,8 +27,7 @@
 //   两版加法次数完全相同，区别只在活跃线程在 warp 里怎么分布
 //
 // 注意：两个 kernel 里循环的上下界都用 blockDim.x（运行期值）来写，
-// 不要用宏 BLOCK。用编译期常量会让编译器把循环完全展开、把 % 优化成
-// 位运算，影响性能比较。
+// 不要用宏 BLOCK。用编译期常量会让编译器把循环完全展开、把 % 优化成位运算，影响性能比较。
 //
 // 写完运行，两个版本都 PASS 后，记录耗时和比值并解释差距。
 //
@@ -39,10 +38,41 @@
 #define BLOCK 256
 
 __global__ void reduce_interleaved(const float *in, float *out) {
+    __shared__ float buf[BLOCK];
+    int t = threadIdx.x;
+    buf[t] = in[blockIdx.x * BLOCK + t];
+    __syncthreads();
+
+    for(int s = 1; s < blockDim.x; s = s * 2){
+        if(t % (2 * s) == 0){
+            buf[t] = buf[t] + buf[t + s];
+        }
+        __syncthreads();
+    }
+
+    if(t == 0){
+        out[blockIdx.x] = buf[0];
+    }
     // TODO：从这里开始写（交错配对版本）
 }
 
 __global__ void reduce_contiguous(const float *in, float *out) {
+    __shared__ float buf[BLOCK];
+    int t = threadIdx.x;
+    buf[t] = in[blockIdx.x * BLOCK + t];
+    __syncthreads();
+
+    for(int s = blockDim.x / 2; s >= 1; s = s / 2){
+        if(t < s){
+            buf[t] = buf[t] + buf[t + s];
+        }
+        __syncthreads();
+    }
+
+    if(t == 0){
+        out[blockIdx.x] = buf[0];
+    }
+    
     // TODO：从这里开始写（连续配对版本）
 }
 
